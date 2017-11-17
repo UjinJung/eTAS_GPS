@@ -1339,7 +1339,7 @@ app.controller('recordsCtrl', function ($scope, $ionicSideMenuDelegate, $firebas
             }
             x.id = cnt;
             x.drivingTimeStr = x.drivingTime.toHHMMSS();
-            x.dateRecord = x.date.slice(0, 24);
+            x.dateRecord = printNow(Date.parse(x.date));
             Records.push(x);
             cnt++;
           }

@@ -11,7 +11,6 @@ app.run(function ($ionicPlatform, $rootScope, $timeout, ngFB) {
     if (window.cordova && window.cordova.plugins.Keyboard) {
       cordova.plugins.Keyboard.hideKeyboardAccessoryBar(true);
       cordova.plugins.Keyboard.disableScroll(true);
-
     }
     if (window.StatusBar) {
       // org.apache.cordova.statusbar required
@@ -24,7 +23,6 @@ app.run(function ($ionicPlatform, $rootScope, $timeout, ngFB) {
   $rootScope.$on("$stateChangeStart", function (event, toState, toParams, fromState, fromParams) {
     $rootScope.authStatus = toState.authStatus;
     if ($rootScope.authStatus) {
-
 
     }
   });
@@ -40,6 +38,8 @@ app.run(function ($ionicPlatform, $rootScope, $timeout, ngFB) {
   });
 
 });
+
+
 app.config(function ($stateProvider, $urlRouterProvider, $ionicConfigProvider) {
 
   // Ionic uses AngularUI Router which uses the concept of states
@@ -47,10 +47,8 @@ app.config(function ($stateProvider, $urlRouterProvider, $ionicConfigProvider) {
   // Set up the various states which the app can be in.
   // Each state's controller can be found in controllers.js
 
-
   $ionicConfigProvider.backButton.previousTitleText(false);
   $ionicConfigProvider.backButton.text('기록')
-
 
 
   $stateProvider
