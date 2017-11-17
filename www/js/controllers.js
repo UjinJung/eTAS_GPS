@@ -1339,7 +1339,7 @@ app.controller('recordsCtrl', function ($scope, $ionicSideMenuDelegate, $firebas
             }
             x.id = cnt;
             x.drivingTimeStr = x.drivingTime.toHHMMSS();
-            x.dateRecord = printNow(Date.parse(x.date));
+            x.dateRecord = x.date.slice(0, 24);
             Records.push(x);
             cnt++;
           }
@@ -1573,10 +1573,20 @@ app.controller('ProfileCtrl', function ($scope, ngFB, $ionicSideMenuDelegate, er
       $scope.user = user;
     },
     function (error) {});
+
   $scope.$watch(function () {
     return errorRecords.getState();
   }, function (event) {
 
     $scope.errorRecords = errorRecords.all();
   }, true);
+
+  
+});
+
+app.filter('reverse', function () {		
+  return function (items) {		
+    // return items.slice().reverse();		
+  return items;		
+  };
 });
