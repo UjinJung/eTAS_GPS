@@ -24,3 +24,28 @@ function printNow(date) {
   
     return now;
   }
+
+  function addInfoWindow(map, marker, message) {
+    var infoWindow = new google.maps.InfoWindow({
+      content: message
+    });
+    google.maps.event.addListener(marker, 'click', function () {
+      infoWindow.open(map, marker);
+    });
+  };
+
+function setMarkersArray(map, item, pushArray){
+  for (var index = 0; index < item.length; index++) {
+    var marker = new google.maps.Marker({
+      position: item[index],
+      map: map
+    });
+    marker.setMap(map);
+    pushArray.push(marker);
+
+    var contentString = '<div id="content" style="margin-top:0px; padding-top:0px; box-shadow: none" >' + '<h4>' + item[0].name + '</h4>' + '</div>';
+    addInfoWindow(map, marker, contentString);
+  }
+
+//   return pushArray;
+}

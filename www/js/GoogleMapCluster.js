@@ -77,14 +77,13 @@ function MarkerClusterer(map, opt_markers, opt_options) {
    * @type {Array.<google.maps.Marker>}
    * @private
    */
-  this.currentPosition;
   this.markers_ = [];
   /**
    *  @type {Array.<Cluster>}
    */
   this.clusters_ = [];
-  //TODO: delete var
-  // this.clustersCoord = [];
+
+
   this.sizes = [60, 63, 68, 78, 90];
   /**
    * @private
@@ -145,6 +144,7 @@ function MarkerClusterer(map, opt_markers, opt_options) {
 
   this.setupStyles_();
   this.setMap(map);
+ 
   /**
    * @type {number}
    * @private
@@ -272,10 +272,12 @@ MarkerClusterer.prototype.getStyles = function() {
   return this.styles_;
 };
 
+// FIXME: ADD getClusters
+// unused function
 /**
- *  Gets the styles.
+ *  Gets the Clusters.
  *
- *  @return {Object} The styles object.
+ *  @return {Object} The clusters object.
  */
 MarkerClusterer.prototype.getClusters = function() {
   return this.clusters_;
@@ -536,14 +538,6 @@ MarkerClusterer.prototype.setReady_ = function(ready) {
 MarkerClusterer.prototype.getTotalClusters = function() {
   return this.clusters_.length;
 };
-// TODO: Delete
-// MarkerClusterer.prototype.getTotalClustersCenter = function() {
-//   for (var index = 0; index < this.clusters_.length; index++) {
-//     var elementCluster = this.clusters_[index];
-//   }
-//   return;
-// };
-
 
 /**
  * Returns the google map that the clusterer is associated with.
@@ -703,51 +697,6 @@ MarkerClusterer.prototype.repaint = function() {
   }, 0);
 };
 
-
-/**
- * Redraws the clusters.
- */
-MarkerClusterer.prototype.redraw = function() {
-  var map_lat = this.map_.getCenter().lat();
-  var map_lng = this.map_.getCenter().lng();
-
-  for (var indexOfCluster = 0; indexOfCluster < this.clusters_.length; indexOfCluster++) {
-
-    var element_lat = this.clusters_[indexOfCluster].getCenter().lat();
-    var element_lng = this.clusters_[indexOfCluster].getCenter().lng();
-
-    var distanceBetweenPositionAndCluster;
-
-    distanceBetweenPositionAndCluster = (Math.pow((map_lat - element_lat), 2) + Math.pow((map_lng - element_lng), 2)) * 1000 * 1000;
-
-    /*
-      Defined cluster
-    */
-    if (distanceBetweenPositionAndCluster < 0.3 && !(this.clusters_[indexOfCluster].getTTS_()) && this.clusters_[indexOfCluster].getMarkersLength_() > 2) {
-
-      console.log("TTS" + this.TTStext_);
-      this.clusters_[indexOfCluster].setTTS_(true);
-      
-      TTS
-        .speak({
-          text: this.TTStext_,
-          locale: 'ko-KR',
-          rate: 1
-        }, function() {
-          // alert('success');
-        }, function(reason) {
-          alert(reason);
-        });
-    }
-    if (distanceBetweenPositionAndCluster >= 1 && this.clusters_[indexOfCluster].getTTS_()) {
-      console.log("FALSE");
-      this.clusters_[indexOfCluster].setTTS_(false);
-    }
-  }
-  this.createClusters_();
-};
-
-
 /**
  * Calculates the distance between two latlng locations in km.
  * @see http://www.movable-type.co.uk/scripts/latlong.html
@@ -771,6 +720,53 @@ MarkerClusterer.prototype.distanceBetweenPoints_ = function(p1, p2) {
   var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   var d = R * c;
   return d;
+};
+
+
+/*
+ * FIXME: ADD
+ * Redraws the clusters.
+ */
+MarkerClusterer.prototype.redraw = function() {
+  // map center coordinates
+  var mapLatLng = this.map_.getCenter();
+  
+  for (var indexOfCluster = 0; indexOfCluster < this.clusters_.length; indexOfCluster++) {
+    // cluster center coordinates
+    var elementLatLng = this.clusters_[indexOfCluster].getCenter();
+
+    var distanceBetweenPositionAndCluster = this.distanceBetweenPoints_(mapLatLng, elementLatLng);
+
+    /*
+     * In 50m
+     * Did not speak TTS
+     * A number of marker is more than 3
+     */
+    if (distanceBetweenPositionAndCluster < 0.05 && !(this.clusters_[indexOfCluster].getSpeakFlagTTS_()) && this.clusters_[indexOfCluster].getMarkersLength_() >= 3) {
+
+      // console.log(this.clusters_[indexOfCluster].getSpeakFlagTTS_());
+      // console.log("TTS" + this.TTStext_);
+      this.clusters_[indexOfCluster].setSpeakFlagTTS_(true);
+      
+      TTS
+        .speak({
+          text: this.TTStext_,
+          locale: 'ko-KR',
+          rate: 1
+        }, function() {
+          // alert('success');
+        }, function(reason) {
+          alert(reason);
+        });
+    }
+
+    // more than 1km away, TTS Speak Flag set FALSE
+    if (distanceBetweenPositionAndCluster >= 1 && this.clusters_[indexOfCluster].getSpeakFlagTTS_()) {
+      // console.log("FALSE");
+      this.clusters_[indexOfCluster].setSpeakFlagTTS_(false);
+    }
+  }
+  this.createClusters_();
 };
 
 
@@ -803,18 +799,6 @@ MarkerClusterer.prototype.addToClosestCluster_ = function(marker) {
     this.clusters_.push(cluster);
   }
 };
-
-// TODO: Delete
-// MarkerClusterer.prototype.getClustersCenter = function() {
-//   var centerArray = [];
-//   var cluster = this.getClusters();
-
-//   for (var i = 0, cluster; cluster = this.clusters_[i]; i++) {
-//     var center = cluster.getCenter();
-//     centerArray.push(center);
-//   }
-//   return centerArray;
-// };
 
 /**
  * Creates the clusters.
@@ -858,18 +842,18 @@ function Cluster(markerClusterer) {
   this.center_ = null;
   this.markers_ = [];
   this.bounds_ = null;
-  this.TTS_ = false;
+  this.SpeakFlagTTS_ = false;
   this.clusterIcon_ = new ClusterIcon(this, markerClusterer.getStyles(),
     markerClusterer.getGridSize());
 }
 
 // 
-Cluster.prototype.getTTS_ = function() {
-  return this.TTS_;
+Cluster.prototype.getSpeakFlagTTS_ = function() {
+  return this.SpeakFlagTTS_;
 };
 // 
-Cluster.prototype.setTTS_ = function(TTSstate) {
-  this.TTS_ = TTSstate;
+Cluster.prototype.setSpeakFlagTTS_ = function(TTSstate) {
+  this.SpeakFlagTTS_ = TTSstate;
 };
 
 Cluster.prototype.getMarkersLength_ = function() {

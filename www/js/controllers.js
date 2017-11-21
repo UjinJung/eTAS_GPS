@@ -15,7 +15,6 @@ app.controller('AppCtrl', function ($scope, $ionicModal, $ionicPopover, $timeout
 
   //--------------------------------------------
   $scope.login = function (user) {
-
     if (typeof (user) == 'undefined') {
       $scope.showAlert('Please fill username and password to proceed.');
       return false;
@@ -34,8 +33,8 @@ app.controller('AppCtrl', function ($scope, $ionicModal, $ionicPopover, $timeout
         $("#error #errmsg").html(e.message);
         return false;
       });
-
   };
+
   //--------------------------------------------
   $scope.signup = function (user) {
 
@@ -64,10 +63,12 @@ app.controller('AppCtrl', function ($scope, $ionicModal, $ionicPopover, $timeout
 
 
   };
+
   //--------------------------------------------
   $scope.logout = function () {
     $location.path('/app/login');
   };
+
   //--------------------------------------------
   // An alert dialog
   $scope.showAlert = function (msg) {
@@ -106,13 +107,85 @@ app.controller('AppCtrl', function ($scope, $ionicModal, $ionicPopover, $timeout
   };
   //--------------------------------------------
 });
+
 app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDelegate, $cordovaDeviceMotion, $deviceGyroscope, $firebaseArray, $ionicLoading, $cordovaGeolocation, RealTime, errorRecords) {
+
+  /*
+   * Clustering
+   */
+
+  // Draw Map
+  // Initialze Coordinates
+  var lat = 37.281;
+  var long = 127.041;
+  var myLatlng = new google.maps.LatLng(lat, long);
+  
+  var mapOption = {
+    center: myLatlng,
+    zoom: 16,
+    mapTypeId: google.maps.MapTypeId.ROADMAP
+  };
+  var map = new google.maps.Map(document.getElementById("errormap"), mapOption);
+  // End Draw Map
+
+  // Cluster Function
+  var clusterMarkersArray = [];
+  function errorClustering(errItem, map) {
+    var pushArray = [];
+
+    setMarkersArray(map, errItem, pushArray);
+    clusterMarkersArray.push(pushArray);
+
+    markerClusterer = new MarkerClusterer(map, clusterMarkersArray[clusterMarkersArray.length - 1], {
+      TTStext: errItem[0].name,
+      imagePath: 'https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/m'
+    });
+  };
+  // End Cluster Function
+
+  // Load errorList and Error Markers clustering
+  var errorRef = firebase.database().ref("errorList");
+  var errorList = $firebaseArray(errorRef);
+  var keepGoing = true;
+  var errorCnt = 0;
+  errorList.$loaded()
+    .then(function (x) {
+      errorRecords.clear();
+      errorCnt = 0;
+
+      angular.forEach(x, function (x) {
+        if (keepGoing) {
+          if (errorCnt == errorList.length) {
+            keepGoing = false;
+          }
+          x.id = errorCnt;
+          errorRecords.push(x);
+          errorCnt++;
+        }
+        keepGoing = true;
+      })
+
+      var errorItem = errorRecords.all();
+      errorRecords.stateChange();
+
+      for (var k = 0; k < 11; k++) {
+        errorClustering(errorItem[k], map);
+      }
+
+      console.log(clusterMarkersArray);
+    })
+    .catch(function (error) {
+      console.log("Error:", error);
+    });
+  // End error Clustering
+
+
   $scope.toggleLeft = function () {
     $ionicSideMenuDelegate.toggleLeft();
   };
 
   $scope.options = {
-    frequency: 100 // Measure every 100ms
+    frequency: 100 
   };
 
   // Current measurements
@@ -123,8 +196,8 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
     x_g: null,
     y_g: null,
     z_g: null,
-    second: 30
-  }
+    second: 60
+  };
 
   // Watcher object
   $scope.watch = null;
@@ -152,94 +225,6 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
     LSL: 0
   };
 
-  /*
-    Clustering
-  */
-  // Draw Map
-  var lat = 37.281;
-  var long = 127.041;
-  var myLatlng = new google.maps.LatLng(lat, long);
-  var mapOption = {
-    center: myLatlng,
-    zoom: 16,
-    mapTypeId: google.maps.MapTypeId.ROADMAP
-  };
-  var map = new google.maps.Map(document.getElementById("errormap"), mapOption);
-
-  var errorRef = firebase.database().ref("errorList");
-  var errorList = $firebaseArray(errorRef);
-  var keepGoing = true;
-  var errorCnt = 0;
-
-  function addInfoWindow(marker, message) {
-    var infoWindow = new google.maps.InfoWindow({
-      content: message
-    });
-    google.maps.event.addListener(marker, 'click', function () {
-      infoWindow.open(map, marker);
-    });
-  };
-
-  function errorClustering(errItem, index, map) {
-    var tempMarkersArray = [];
-    for (var index = 0; index < errItem.length; index++) {
-      var marker = new google.maps.Marker({
-        position: errItem[index],
-        map: map
-      });
-      marker.setMap(map);
-      tempMarkersArray.push(marker);
-
-      var contentString = '<div id="content" style="margin-top:0px; padding-top:0px; box-shadow: none" >' + '<h4>' + errItem[0].name + '</h4>' + '</div>';
-      addInfoWindow(marker, contentString);
-      //w
-    }
-    clusterMarkersArray.push(tempMarkersArray);
-    markerClusterer = new MarkerClusterer(map, clusterMarkersArray[clusterMarkersArray.length - 1], {
-      TTStext: errItem[0].name,
-      imagePath: 'https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/m'
-    });
-  };
-
-  errorList.$loaded()
-    .then(function (x) {
-      errorRecords.clear();
-      errorCnt = 0;
-
-      angular.forEach(x, function (x) {
-        if (keepGoing) {
-          if (errorCnt == errorList.length) {
-            keepGoing = false;
-          }
-          x.id = errorCnt;
-          errorRecords.push(x);
-          errorCnt++;
-        }
-        keepGoing = true;
-      })
-
-      var errorItem = errorRecords.all();
-      errorRecords.stateChange();
-
-
-      for (var k = 0; k < 11; k++) {
-        errorClustering(errorItem[k], k, map);
-      }
-
-      console.log(clusterMarkersArray);
-      // Stop the ion-refresher from spinning
-    })
-    .catch(function (error) {
-      console.log("Error:", error);
-    });
-
-  var clusterMarkersArray = [];
-
-  // var obj2 = $firebaseObject(ref);
-  // obj.$remove();
-  // obj2.$remove();
-  // Start measurements when Cordova device is ready
-
   var madgwick = new AHRS({
     /*
      * The sample interval, in Hz.
@@ -258,10 +243,13 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
      */
     beta: beta
   });
-  // FIXME: add lati, long, myLatlng
-  var x_a, y_a, z_a, x_g, y_g, z_g, date, lati, long, myLatlng, initQ, tmpQ, cnt = 0,
+
+  var x_a, y_a, z_a, x_g, y_g, z_g, date, initQ, tmpQ, cnt = 0,
     sum3 = 0,
     sum6 = 0,
+    /* judgeTimeX
+     * X 위험행동이 판정되어진 시간 
+     */
     judgeTime3 = 0,
     judgeTime6 = 0,
     judgeTimeAcc = 0,
@@ -271,6 +259,10 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
     judgeTimeSL = 0,
     judgeTimeLSL = 0,
     judgeTimeCC = 0,
+    /*
+     * judgeCntX
+     * X 위험행동이 판정된 횟수 
+     */
     judgeCntSL = 0,
     judgeCntLSL = 0,
     judgeCnt3L = 0,
@@ -282,19 +274,24 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
     judgeCntStop = 0,
     judgeCntCC = 0,
     judgeCntCF = 0,
-    speed = 0,
-    speedA = 0,
-    acc = 0,
-    accG = 0,
-    timeG = 0,
+    /*
+     * 급진로변경 / 급앞지르기 때문에 3개 필요
+     */
     angularVel = 0,
     angularVelFor5 = 0,
     angularVel_cur = 0,
+    // For average speed
     speedSum = 0,
+    // 장기 과속 시간 체크
     CntLSL = 0,
+
+    accGPS = 0,
+    timeG = 0,
     errorAngle3 = errorAngle6 = false;
-  var sensorQueue = [];
-  var compareQueue = [];
+    // speed = 0,
+    // acc = 0,
+   
+  // Data storage
   var rotationAng = [];
   var uturnAng = [];
   var rotationCntL = [];
@@ -310,40 +307,52 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
   var CFCnt = [];
   var rotationErr = [];
   var uturnErr = [];
-  var accQueue = [];
+  // GPS Speed Queue
+  var speedGPSQueue = [];
+  // Speed calculation via GPS speed
   var speedList = [];
   var accList = [];
+  // Device sensor
+  var sensorQueue = [];
+  var compareQueue = [];
   var angularList = [];
-  var speedGQueue = [];
-  var timeGQueue = [];
+  // GPS로 speed 측정 시 cntGPS 상승
+  // GPSQueue에 enqueue 차량이 멈추었는지 chk
   var GPSQueue = [];
-  var speedQ = [];
-
-  // FIXME: add List
+  var cntGPS = 0;
+  // 급출발 시 시작 속도 chk; obj.speed : 현재 속도
+  var speedQueue = [];
   var positionList = [];
   var errorList = [];
 
+  // Delete
+  var timeGQueue = [];
+  // var accQueue = [];
+  
+
   var ref = firebase.database().ref("record");
   var list = $firebaseArray(ref);
-  var cntGPS = 0;
-  const calTime = 6000;
-  const secondCnt = (1000 / $scope.options.frequency);
-  var mixBut = document.getElementById("mixBut");
 
+  const calTime = 6000;
+  const secondCnt = (1000 / $scope.options.frequency); // 10
+  var mixBut = document.getElementById("mixBut");
   mixBut.addEventListener("click", startWatching);
 
-  //Start Watching method
+  // Start Watching Function
   function startWatching() {
     if (cnt == 0) {
-      // FIXME: remove inputLat, long, myLatlng, pointList
       var gpsSpeed = 0;
-
-      var accuracy;
+      var lati, long, myLatlng, accuracy;
 
       $ionicLoading.show({
         template: '<ion-spinner icon="bubbles"></ion-spinner><br/>data calibarion!'
       });
 
+      /*
+       * Google Maps API
+       * Find position coord, speed, ...
+       */
+      // Google Maps Geolocation option
       function geo_success(position) {
         lati = position.coords.latitude;
         long = position.coords.longitude;
@@ -357,49 +366,45 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
           lng: long
         });
         if (position.coords.speed) {
-          speedGQueue.push(gpsSpeed);
+          speedGPSQueue.push(gpsSpeed);
           timeGQueue.push(position.timestamp);
         }
 
-        if (!!speedGQueue[1]) {
-
-          accG = (speedGQueue[1] - speedGQueue[0]);
+        if (speedGPSQueue[1]) {
+          accGPS = (speedGPSQueue[1] - speedGPSQueue[0]);
 
           cntGPS++;
-          speedGQueue.shift();
+          speedGPSQueue.shift();
         }
-        if (!!timeGQueue[1]) {
-
+        if (timeGQueue[1]) {
           timeG = (timeGQueue[1] - timeGQueue[0]) / 1000;
 
           timeGQueue.shift();
         }
 
-
-        if (!!speedGQueue[0]) {
-          obj.speed = Math.round(speedGQueue[0]);
-          obj.accVel = Math.round(accG);
+        if (speedGPSQueue[0]) {
+          obj.speed = Math.round(speedGPSQueue[0]);
+          obj.accVel = Math.round(accGPS);
         } else {
           obj.speed = 0;
           obj.accVel = 0;
         }
-
-
       }
-
       function geo_error() {
         console.log(err);
       }
-
       var geo_options = {
         enableHighAccuracy: true,
         maximumAge: 0,
         timeout: 3000
       };
 
+      // Find position and speed and ...
       $scope.watch3 = navigator.geolocation.watchPosition(geo_success, geo_error, geo_options);
 
-      var MaxQueue = ($scope.measurements.second * 200) / $scope.options.frequency;
+      // second : 60 / frequency : 100
+      // var MaxQueue = ($scope.measurements.second * 200) / $scope.options.frequency;
+      var MaxQueue = $scope.measurements.second;
       var errorRate = 0.04 / secondCnt;
 
       for (var i = 0; i < MaxQueue; i++)
@@ -409,11 +414,11 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
       $scope.watch = $cordovaDeviceMotion.watchAcceleration($scope.options);
       $scope.watch2 = $deviceGyroscope.watch($scope.options);
 
+
       // Device motion initilaization
       $scope.watch.then(null, function (error) {
         console.log('Error');
       }, function (result) {
-
         // Set current Acc data
         x_a = result.x;
         y_a = result.y;
@@ -421,18 +426,18 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
       });
 
 
-
       // Device motion initilaization
       $scope.watch2.then(null, function (error) {
         console.log('Error');
       }, function (result) {
-
         // Set current Gyro data
         x_g = result.x;
         y_g = result.y;
         z_g = result.z;
 
+
         madgwick.update(x_g, y_g, z_g, x_a, y_a, z_a, cnt);
+
 
         if (cnt == calTime / $scope.options.frequency) {
           initQ = madgwick.conj(); //Current posture estimation
@@ -440,71 +445,50 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
           $ionicLoading.hide();
           location.href = "#/tab/dash";
         }
+
+        /*
+         * Calibration finish
+         * measurement start
+         */
         if (cnt > calTime / $scope.options.frequency) {
           tmpQ = madgwick.getQuaternion();
 
           RealTime.setId(cnt);
 
-
-
           if (cnt % 10 == 0) {
             GPSQueue.push(cntGPS);
-
-
             $scope.measurements.test3 = cntGPS;
 
-
-            if (!!GPSQueue[1]) {
-
+            if (GPSQueue[1]) {
               $scope.measurements.test = (GPSQueue[1] == GPSQueue[0]);
-              if (GPSQueue[1] == GPSQueue[0] && speedA < 0.2) {
-
+              if (GPSQueue[1] == GPSQueue[0]) {
                 obj.speed = 0;
-                accG = obj.accVel = 0 - speedGQueue[0];
-                speedGQueue[0] = 0;
-
-
-
+                accGPS = obj.accVel = 0 - speedGPSQueue[0];
+                speedGPSQueue[0] = 0;
               }
-
-
               GPSQueue.shift();
             }
 
-
-            speedQ.push(obj.speed);
+            speedQueue.push(obj.speed);
             speedList.push(obj.speed);
             accList.push(obj.accVel);
 
             speedSum += obj.speed;
-
           }
-
-
-
 
           //gravity compensation
           x_a -= gravity * (2 * (tmpQ.x * tmpQ.z - tmpQ.w * tmpQ.y));
           y_a -= gravity * (2 * (tmpQ.w * tmpQ.x + tmpQ.y * tmpQ.z));
           z_a -= gravity * (tmpQ.w * tmpQ.w - tmpQ.x * tmpQ.x - tmpQ.y * tmpQ.y + tmpQ.z * tmpQ.z);
 
-          accQueue.push(Math.sqrt(Math.pow(x_a, 2) + Math.pow(y_a, 2) + Math.pow(z_a, 2)));
-
-
-
-          //speed calculate
-          let sum = acc / secondCnt;
-          speedA += sum;
-          if (speedA < 0)
-            speedA = 0;
-
+          // accQueue.push(Math.sqrt(Math.pow(x_a, 2) + Math.pow(y_a, 2) + Math.pow(z_a, 2)));
 
           //calibration
           madgwick.set(madgwick.multiply(initQ));
           sensorQueue.push(madgwick.getEulerAnglesDegrees().yaw);
 
           //angle calculate
-          if (!!sensorQueue[1]) {
+          if (sensorQueue[1]) {
             if ((sensorQueue[0] - sensorQueue[1]) > 300) {
               compareQueue.push((sensorQueue[0] - sensorQueue[1]) - 360 - errorRate);
             } else if ((sensorQueue[0] - sensorQueue[1]) < -300) {
@@ -515,24 +499,24 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
             sensorQueue.shift();
           }
 
-
-          //angularVel_cur calculate
+          /*
+           * angularVel_cur : 현재 각속도
+           */
           angularVel_cur = compareQueue.slice(Math.round(MaxQueue * (5 / 6)), MaxQueue).reduce(function (a, b) {
             return a + b;
           });
           angularList.push(angularVel_cur.toFixed(2));
 
           obj.angularVel = Math.round(angularVel_cur);
-
-
-
-          //angularVel calculate
-
+          /*
+           * angularVel     : 2 - 3초 사이 각도; 급진로변경 급앞지르기 당시 누적각도
+           * angularVelFor5 : 1 - 5초 사이 각도; 급진로변경 급급지르기 당시 5초동안 누적각도 
+           */
+          // angularVel calculate
           angularVel = compareQueue.slice(Math.round(MaxQueue * (2 / 6)), Math.round(MaxQueue * (3 / 6))).reduce(function (a, b) {
             return a + b;
           });
-          //angularVelFor5 calculate
-          
+          // angularVelFor5 calculate
           angularVelFor5 = 0;
           for(var i = 1; i<6; i++){
             angularVelFor5 += compareQueue.slice(Math.round(MaxQueue * (i / 6)), MaxQueue *((i+1) / 6)).reduce(function (a, b) {
@@ -540,8 +524,7 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
           });
           }
 
-
-          //error calculate
+          // error calculate
           errorAngle3 = errorAngle6 = false;
           for (var i = 0; i <= MaxQueue - Math.round(MaxQueue / 6); i++) {
             if (Math.abs(compareQueue.slice(i, i + Math.round(MaxQueue / 6)).reduce(function (a, b) {
@@ -557,7 +540,7 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
           }
 
 
-          //angle judgement
+          // angle judgement
           sum3 = compareQueue.slice(MaxQueue / 2, MaxQueue).reduce(function (a, b) {
             return a + b;
           });
@@ -567,13 +550,12 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
 
 
 
-          //rotation judge
+          // rotation judge
+          // 속도가 30km/h 이상이고, 3초안에 좌/우측(누적회전각이 60˚ ~ 120˚범위)로 급회전 하는 경우
           if (cnt - judgeTime3 > MaxQueue / 2 && !errorAngle3 && obj.speed > 30) {
 
             if (sum3 < -60 && sum3 > -120) {
               judgeCnt3L++;
-              // FIXME: errorList
-              // 다른 errorList와 name만 다릅니다!
               errorList.push({
                 name: '급좌회전',
                 time: Date.parse(date) + (cnt - 60) * 100,
@@ -599,10 +581,10 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
 
               obj.rotationR = judgeCnt3R;
             }
-
           }
 
-          //uturn judge
+          // uturn judge
+          // 속도가 25km/h 이상이고, 6초안에 좌/우측(누적회전각이 160˚ ~ 180˚범위)로 급회전 하는 경우
           if (cnt - judgeTime6 > MaxQueue && !errorAngle6 && obj.speed > 25) {
 
             if (Math.abs(sum6) > 160 && Math.abs(sum6) < 180) {
@@ -620,8 +602,9 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
             }
           }
 
-          //Acceleration judge
-          if (cnt - judgeTimeAcc > MaxQueue && obj.speed >= 6 && accG >= 8) {
+          // Acceleration judge
+          // 6km/h 이상 속도에서 초당 8km/h 이상 가속 운행 하는 경우
+          if (cnt - judgeTimeAcc > MaxQueue && obj.speed >= 6 && accGPS >= 8) {
             judgeCntAcc++;
             errorList.push({
               name: '급가속',
@@ -634,8 +617,10 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
 
             obj.acc = judgeCntAcc;
           }
-          //Quick start judge
-          if (cnt - judgeTimeStart > secondCnt * 3 && speedQ[0] <= 5 && accG >= 10) {
+
+          // Quick start judge
+          // 5km/h 이하 속도에서 초당 10km/h 이상 가속 운행 하는 경우
+          if (cnt - judgeTimeStart > secondCnt * 3 && speedQueue[0] <= 5 && accGPS >= 10) {
             judgeCntStart++;
             errorList.push({
               name: '급출발',
@@ -649,8 +634,9 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
             obj.start = judgeCntStart;
           }
 
-          //Deceleration judge
-          if (cnt - judgeTimeDcc > MaxQueue && obj.speed >= 6 && accG <= -14) {
+          // Deceleration judge
+          // 초당 14.0km/h 이상 감속 운행하고 속도가 6.0km/h 이상인 경우
+          if (cnt - judgeTimeDcc > MaxQueue && obj.speed >= 6 && accGPS <= -14) {
             judgeCntDcc++;
             errorList.push({
               name: '급감속',
@@ -664,8 +650,9 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
             obj.dcc = judgeCntDcc;
           }
 
-          //Emergency stop judge
-          if (cnt - judgeTimeStop > secondCnt * 3 && obj.speed <= 5 && accG <= -14) {
+          // Emergency stop judge
+          // 초당 14.0km/h 이상 감속하여 속도가 5.0km/h 이하가 된 경우 
+          if (cnt - judgeTimeStop > secondCnt * 3 && obj.speed <= 5 && accGPS <= -14) {
             judgeCntStop++;
             errorList.push({
               name: '급정지',
@@ -679,9 +666,11 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
             obj.stop = judgeCntStop;
           }
 
-          //Change course && Advance judge
+          // Change course && Advance judge
+          // 속도가 30km/h 이상에서 진행 방향이 좌/우측 10˚/sec 이상으로 차로변경하고, 5초동안 누적각도가 ±2˚/sec이하, 가감속이 초당 ±2km/h이하인 경우 
+          // 속도가 30km/h 이상에서 진행 방향이 좌/우측 10˚/sec 이상으로 차로변경하고, 5초동안 누적각도가 ±2˚/sec이하, 가속이 초당 ±3km/h이상인 경우 
           if (cnt - judgeTimeCC > secondCnt * 5 && obj.speed >= 30 && Math.abs(angularVel) >= 10 && Math.abs(angularVelFor5) <= 2) {
-            if (Math.abs(accG) <= 2) {
+            if (Math.abs(accGPS) <= 2) {
               judgeCntCC++;
               errorList.push({
                 name: '급진로변경',
@@ -692,7 +681,7 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
               });
             }
 
-            if (accG >= 3) {
+            if (accGPS >= 3) {
               judgeCntCF++;
               errorList.push({
                 name: '급앞지르기',
@@ -710,7 +699,8 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
 
           }
 
-          //Speeding judge
+          // Speeding judge
+          // 도로 제한 속도보다 20km/h 이상 빠르게 운행 시
           if (cnt - judgeTimeSL > secondCnt * 3 && obj.speed >= speedLimit) {
             judgeCntSL++;
             errorList.push({
@@ -726,7 +716,8 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
             obj.SL = judgeCntSL;
           }
 
-          //Long-tern Speeding judge
+          // Long-tern Speeding judge
+          // 도로 제한 속도보다 20km/h 이상 3분 이상 빠르게 운행 시
           if (obj.speed >= speedLimit) {
 
             CntLSL++;
@@ -748,7 +739,6 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
             CntLSL = 0;
           }
 
-
           //Data storage
           rotationAng.push(sum3.toFixed(2));
           uturnAng.push(sum6.toFixed(2));
@@ -768,37 +758,34 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
 
           RealTime.update(obj);
 
-
           compareQueue.shift();
-
         }
+        
         $scope.measurements.speedG = obj.speed;
 
-        if ((cnt % 10 == 0) && !!speedQ[1])
-          speedQ.shift();
+        if ((cnt % 10 == 0) && speedQueue[1])
+          speedQueue.shift();
 
         if (cnt > calTime / $scope.options.frequency)
           madgwick.set(tmpQ);
 
         cnt++;
-
+        console.log(cnt);
       });
-
-
 
     }
     mixBut.removeEventListener("click", startWatching);
     mixBut.addEventListener("click", stopWatching);
     mixBut.value = "Stop";
     mixBut.style.backgroundColor = '#f4511e';
-
   };
+  // End Start Watching
 
-  // Stop watching method
+  // Stop Watching Function
   function stopWatching() {
     compareQueue = [];
     sensorQueue = [];
-    accQueue = [];
+    // accQueue = [];
     speedQueue = [];
     cnt = sum3 = sum6 = judgeTime3 = judgeTime6 = judgeTimeAcc = judgeTimeDcc = judgeTimeStart = judgeTimeStop = judgeTimeSL = judgeTimeLSL = 0;
 
@@ -841,7 +828,6 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
       StopCnt,
       CCCnt,
       CFCnt,
-      // FIXME: errorList, positionList 추가
       errorList,
       positionList
     }
@@ -869,7 +855,6 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
     StopCnt = [];
     CCCnt = [];
     CFCnt = [];
-    // FIXME: errorList, positionList 추가
     errorList = [];
     positionList = [];
 
@@ -878,12 +863,13 @@ app.controller('measureCtrl', function ($scope, $ionicPlatform, $ionicSideMenuDe
     mixBut.addEventListener("click", startWatching);
     mixBut.value = "Start";
     mixBut.style.backgroundColor = "#4CAF50";
-
   }
+  // End Stop Watching Function
 
   $scope.$on('$ionicView.beforeLeave', function () {});
 
 });
+
 app.controller("DashCtrl", function ($scope, $ionicSideMenuDelegate, RealTime) {
 
   $scope.toggleLeft = function () {
@@ -926,7 +912,6 @@ app.controller("DashCtrl", function ($scope, $ionicSideMenuDelegate, RealTime) {
         });
     }
   }
-
 
   // The speed gauge
   var chartSpeed = Highcharts.chart('speed', {
@@ -1033,6 +1018,7 @@ app.controller("DashCtrl", function ($scope, $ionicSideMenuDelegate, RealTime) {
     }]
 
   });
+
   $scope.$watch(function () {
     return RealTime.getId();
   }, function (event) {
@@ -1122,20 +1108,13 @@ app.controller("DashCtrl", function ($scope, $ionicSideMenuDelegate, RealTime) {
     voice(event, voiceList[10]);
   });
 
-
-
-
-
-
 });
+
 app.controller('graphsCtrl', function ($scope, $ionicSideMenuDelegate, RealTime) {
 
   $scope.toggleLeft = function () {
     $ionicSideMenuDelegate.toggleLeft();
   };
-
-
-
 
   Highcharts.setOptions({
     global: {
@@ -1151,13 +1130,6 @@ app.controller('graphsCtrl', function ($scope, $ionicSideMenuDelegate, RealTime)
       events: {
         load: function () {
 
-          // set up the updating of the chart each second
-          // var series = this.series[0];
-          // setInterval(function () {
-          //     var x = (new Date()).getTime(), // current time
-          //         y = Math.random();
-          //     series.addPoint([x, y], true, true);
-          // }, 1000);
         }
       }
     },
@@ -1225,6 +1197,7 @@ app.controller('graphsCtrl', function ($scope, $ionicSideMenuDelegate, RealTime)
       }())
     }]
   });
+
   var chartGraph2 = Highcharts.chart('container2', {
     chart: {
       type: 'spline',
@@ -1282,6 +1255,7 @@ app.controller('graphsCtrl', function ($scope, $ionicSideMenuDelegate, RealTime)
       }())
     }]
   });
+
   var i = 0;
   $scope.$watch(function () {
     return RealTime.getId();
@@ -1296,6 +1270,7 @@ app.controller('graphsCtrl', function ($scope, $ionicSideMenuDelegate, RealTime)
   });
 
 });
+
 app.controller('recordsCtrl', function ($scope, $ionicSideMenuDelegate, $firebaseArray, Records) {
 
   $scope.toggleLeft = function () {
@@ -1324,7 +1299,6 @@ app.controller('recordsCtrl', function ($scope, $ionicSideMenuDelegate, $firebas
     return hours + ':' + minutes + ':' + seconds;
   }
 
-  // FIXME: for refresh
   $scope.load = function () {
     list.$loaded()
       .then(function (x) {
@@ -1358,6 +1332,7 @@ app.controller('recordsCtrl', function ($scope, $ionicSideMenuDelegate, $firebas
 
   $scope.load();
 });
+
 app.controller('recordCtrl', function ($scope, $stateParams, Records, $firebaseArray, $cordovaGeolocation) {
   $scope.item = Records.get($stateParams.recordId);
   var ref = firebase.database().ref("record");
@@ -1501,49 +1476,20 @@ app.controller('recordCtrl', function ($scope, $stateParams, Records, $firebaseA
     for (var i = 0; i < markersArray.length; i++) {
       markersArray[i].setMap(null);
     }
-    // markerCluster.setMap(map);
   };
   // removes the map on all Polylines.
   function removePolylines() {
     poly.setMap(null);
   }
 
-  function addInfoWindow(marker, message) {
-
-    var infoWindow = new google.maps.InfoWindow({
-      content: message
-    });
-
-    google.maps.event.addListener(marker, 'click', function () {
-      infoWindow.open(map, marker);
-    });
-
-  }
   // sets the map on all markers in the array.
   function setMarkers(locations) {
-    for (var i = 0; i < locations.length; i++) {
-      var marker = new google.maps.Marker({
-        position: locations[i],
-        map: map,
-      })
-      marker.setMap(map);
-      markersArray.push(marker);
-
-      // console.log(locations);
-
-      var contentString = '<div id="content" style="margin-top:0px; padding-top:0px; box-shadow: none" >' + '<h4>' + locations[i].name + '</h4>' + '<div>' + printNow(locations[i].time) + '</div>' + '</div>';
-      addInfoWindow(marker, contentString);
-    }
-    // markerClusterer = new MarkerClusterer(map, markersArray, null);
-
+    setMarkersArray(map, locations, markersArray);
   }
 
-  // FIXME: pathSvc -> Records
   $scope.$watch(function () {
     return Records.getId();
   }, function (event) {
-    // console.log("null");
-    // items = pathService.getItems();
     removePolylines();
     removeMarkers();
     drawMarker();
@@ -1554,11 +1500,9 @@ app.controller('recordCtrl', function ($scope, $stateParams, Records, $firebaseA
       Records.remove(id.id);
       location.href = "#/tab/records";
     });
-    // Records.remove(id.id);
-    // location.href = "#/tab/records";
   };
-
 });
+
 app.controller('ProfileCtrl', function ($scope, ngFB, $ionicSideMenuDelegate, errorRecords) {
   $scope.toggleLeft = function () {
     $ionicSideMenuDelegate.toggleLeft();
@@ -1582,11 +1526,4 @@ app.controller('ProfileCtrl', function ($scope, ngFB, $ionicSideMenuDelegate, er
   }, true);
 
   
-});
-
-app.filter('reverse', function () {		
-  return function (items) {		
-    // return items.slice().reverse();		
-  return items;		
-  };
 });
